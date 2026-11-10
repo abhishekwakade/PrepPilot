@@ -1,0 +1,21 @@
+Project Name: PrepPilot
+
+Developer: Abhishek Wakade
+
+GitHub Repository: https://github.com/abhishekwakade/PrepPilot
+
+Description:
+PrepPilot is an AI-powered personalized learning assistant designed to help students study smarter through personalized study plans, quiz generation, and answer evaluation.
+
+Technology Stack:
+- HTML
+- CSS
+- JavaScript
+- Node.js
+- Express.js
+
+AI Platform:
+BharatCode API
+
+Current Status:
+Backend and frontend features are implemented. Demo mode is currently active while awaiting BharatCode API access.
