@@ -308,6 +308,92 @@ Rules:
 });
 
 
+
+
+// 5. ADAPTIVE REVISION RECOMMENDATIONS
+router.post("/recommend-revision", async (req, res) => {
+    try {
+        const { subject, topic, incorrectAnswers } = req.body;
+
+        if (
+            !subject?.trim() ||
+            !topic?.trim() ||
+            !Array.isArray(incorrectAnswers) ||
+            incorrectAnswers.length === 0 ||
+            incorrectAnswers.length > 5
+        ) {
+            return res.status(400).json({
+                success: false,
+                message: "Subject, topic, and 1–5 incorrect answers are required."
+            });
+        }
+
+        const safeAnswers = incorrectAnswers.map((item, index) => ({
+            question: String(item.question || "").slice(0, 500),
+            studentAnswer: String(item.studentAnswer || "Not answered").slice(0, 300),
+            correctAnswer: String(item.correctAnswer || "").slice(0, 300),
+            explanation: String(item.explanation || "").slice(0, 500)
+        }));
+
+        const prompt = `
+You are an adaptive learning coach.
+
+A student completed a quiz and got some questions wrong.
+
+Subject: ${subject}
+Quiz topic: ${topic}
+Incorrect answers:
+${JSON.stringify(safeAnswers, null, 2)}
+
+Identify the underlying concepts the student should revise.
+
+Return ONLY valid JSON in this format:
+{
+  "weakConcepts": ["Concept needing revision"],
+  "revisionTasks": ["Specific action the student should take"],
+  "practiceAdvice": "One short, encouraging next step"
+}
+
+Rules:
+- Give 1–3 weak concepts.
+- Give 2–3 practical revision tasks.
+- Base recommendations only on the supplied questions and explanations.
+- Keep advice specific to this student's mistakes.
+- No Markdown or text outside JSON.
+`;
+
+        const aiResult = await generateAIResponse(prompt);
+
+        if (!aiResult.success || aiResult.mode !== "live") {
+            throw new Error(aiResult.message || "Revision recommendation failed.");
+        }
+
+        const result = parseAIJson(aiResult.message);
+
+        if (
+            !Array.isArray(result.weakConcepts) ||
+            !Array.isArray(result.revisionTasks) ||
+            typeof result.practiceAdvice !== "string"
+        ) {
+            throw new Error("AI returned an invalid revision recommendation.");
+        }
+
+        res.json({
+            success: true,
+            mode: "live",
+            weakConcepts: result.weakConcepts.slice(0, 3),
+            revisionTasks: result.revisionTasks.slice(0, 3),
+            practiceAdvice: result.practiceAdvice
+        });
+    } catch (error) {
+        console.error("Revision Recommendation Error:", error.message);
+        res.status(500).json({
+            success: false,
+            message: error.message
+        });
+    }
+});
+
 // 4. AI SERVICE TEST
 
 router.post("/ai-test", async (req, res) => {
