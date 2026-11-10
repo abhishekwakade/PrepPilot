@@ -1,0 +1,220 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PrepPilot | AI Learning Assistant</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<div class="app">
+
+    <aside class="sidebar">
+        <div class="brand">
+            <span class="brand-icon">✦</span>
+            <span>PrepPilot</span>
+        </div>
+
+        <p class="menu-label">WORKSPACE</p>
+
+        <nav>
+            <button class="nav-item active" data-page="dashboard">⌂ Dashboard</button>
+            <button class="nav-item" data-page="planner">▤ Study Planner</button>
+            <button class="nav-item" data-page="quiz">✎ AI Quiz</button>
+            <button class="nav-item" data-page="evaluator">◎ Answer Evaluator</button>
+            <button class="nav-item" data-page="progress">▥ My Progress</button>
+        </nav>
+
+        <div class="sidebar-bottom">
+            <div class="profile-avatar">A</div>
+            <div>
+                <strong>Student</strong>
+                <small>Learning every day</small>
+            </div>
+        </div>
+    </aside>
+
+    <main class="main">
+
+        <header class="topbar">
+            <div>
+                <span class="eyebrow">YOUR PERSONAL AI LEARNING SPACE</span>
+                <h2 id="page-heading">Dashboard</h2>
+            </div>
+            <div class="date-label" id="today"></div>
+        </header>
+
+        <!-- DASHBOARD -->
+        <section class="page active" id="dashboard">
+
+            <div class="welcome">
+                <div>
+                    <span class="eyebrow">WELCOME TO PREPPILOT</span>
+                    <h1>Learn smarter.<br>Grow faster.</h1>
+                    <p>Your personal learning companion is ready to help you.</p>
+                    <button class="primary-btn" onclick="showPage('planner')">
+                        Create study plan →
+                    </button>
+                </div>
+                <div class="welcome-symbol">✦</div>
+            </div>
+
+            <h3 class="section-heading">Your learning overview</h3>
+
+            <div class="stats-grid">
+                <div class="stat-card">
+                    <span>📚</span>
+                    <p>Quizzes attempted</p>
+                    <h2 id="quiz-count">0</h2>
+                </div>
+                <div class="stat-card">
+                    <span>🎯</span>
+                    <p>Average score</p>
+                    <h2 id="average-score">0%</h2>
+                </div>
+                <div class="stat-card">
+                    <span>⏱️</span>
+                    <p>Study sessions</p>
+                    <h2 id="session-count">0</h2>
+                </div>
+            </div>
+
+            <div class="content-grid">
+                <div class="panel">
+                    <h3>Quick actions</h3>
+                    <p class="muted">What would you like to do today?</p>
+
+                    <button class="action-card" onclick="showPage('planner')">
+                        <span>📅</span>
+                        <div><strong>Create a study plan</strong><small>Organize your learning</small></div>
+                        <b>→</b>
+                    </button>
+
+                    <button class="action-card" onclick="showPage('quiz')">
+                        <span>📝</span>
+                        <div><strong>Practice a quiz</strong><small>Test your knowledge</small></div>
+                        <b>→</b>
+                    </button>
+
+                    <button class="action-card" onclick="showPage('evaluator')">
+                        <span>💡</span>
+                        <div><strong>Evaluate an answer</strong><small>Improve your understanding</small></div>
+                        <b>→</b>
+                    </button>
+                </div>
+
+                <div class="panel">
+                    <h3>Learning activity</h3>
+                    <p class="muted">Your recent activity</p>
+                    <div id="recent-activity" class="empty-state">
+                        <span>🌱</span>
+                        <p>Your learning journey starts here.</p>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- STUDY PLANNER -->
+        <section class="page" id="planner">
+            <div class="panel form-panel">
+                <h3>Create your personalized study plan</h3>
+                <p class="muted">Tell us about your learning goals.</p>
+
+                <label>Subject</label>
+                <input id="subject" placeholder="e.g. Java, Mathematics, CDS">
+
+                <label>Topic</label>
+                <input id="topic" placeholder="e.g. Arrays, Algebra, Geography">
+
+                <div class="form-row">
+                    <div>
+                        <label>Daily study hours</label>
+                        <input id="hours" type="number" min="1" max="12" value="2">
+                    </div>
+                    <div>
+                        <label>Duration (days)</label>
+                        <input id="duration" type="number" min="1" max="30" value="7">
+                    </div>
+                </div>
+
+                <button class="primary-btn" id="plan-btn">Generate study plan ✦</button>
+
+                <div id="plan-result" class="result-box hidden"></div>
+            </div>
+        </section>
+
+        <!-- QUIZ -->
+        <section class="page" id="quiz">
+            <div class="panel form-panel">
+                <h3>AI Quiz Generator</h3>
+                <p class="muted">Practice and test your knowledge.</p>
+
+                <label>Subject</label>
+                <input id="quiz-subject" placeholder="e.g. Java">
+
+                <label>Topic</label>
+                <input id="quiz-topic" placeholder="e.g. Arrays">
+
+                <label>Difficulty</label>
+                <select id="difficulty">
+                    <option>Easy</option>
+                    <option selected>Medium</option>
+                    <option>Hard</option>
+                </select>
+
+                <button class="primary-btn" id="quiz-btn">Generate quiz ✦</button>
+
+                <div id="quiz-result" class="result-box hidden"></div>
+            </div>
+        </section>
+
+        <!-- ANSWER EVALUATOR -->
+        <section class="page" id="evaluator">
+            <div class="panel form-panel">
+                <h3>Answer Evaluator</h3>
+                <p class="muted">Submit an answer and receive feedback.</p>
+
+                <label>Question</label>
+                <textarea id="question" placeholder="Enter your question..."></textarea>
+
+                <label>Your answer</label>
+                <textarea id="answer" placeholder="Write your answer here..."></textarea>
+
+                <button class="primary-btn" id="evaluate-btn">Evaluate my answer ✦</button>
+
+                <div id="evaluation-result" class="result-box hidden"></div>
+            </div>
+        </section>
+
+        <!-- PROGRESS -->
+        <section class="page" id="progress">
+            <div class="panel">
+                <h3>Your learning progress</h3>
+                <p class="muted">Keep practicing to improve your performance.</p>
+
+                <div class="progress-item">
+                    <div><strong>Quizzes completed</strong><span id="progress-quizzes">0</span></div>
+                    <div class="progress-track"><div id="quiz-bar"></div></div>
+                </div>
+
+                <div class="progress-item">
+                    <div><strong>Average quiz score</strong><span id="progress-average">0%</span></div>
+                    <div class="progress-track"><div id="score-bar"></div></div>
+                </div>
+
+                <div id="progress-message" class="empty-state">
+                    Your progress will appear here as you learn.
+                </div>
+            </div>
+        </section>
+
+        <footer>© 2026 PrepPilot · Built for smarter learning.</footer>
+
+    </main>
+</div>
+
+<script src="script.js"></script>
+</body>
+</html>
