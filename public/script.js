@@ -187,27 +187,10 @@ document.getElementById("plan-btn").addEventListener("click", async () => {
 });
 
 
-// TEMPORARY SAMPLE QUIZ GENERATOR
 
-const sampleQuestions = [
-    {
-        question: "Which data structure follows LIFO?",
-        options: ["Queue", "Stack", "Array", "Tree"],
-        answer: 1
-    },
-    {
-        question: "Which keyword is used to create an object in Java?",
-        options: ["new", "class", "static", "void"],
-        answer: 0
-    },
-    {
-        question: "What is the time complexity of accessing an array element by index?",
-        options: ["O(n)", "O(log n)", "O(1)", "O(n²)"],
-        answer: 2
-    }
-];
+// AI QUIZ GENERATOR - LIVE QWEN API
 
-document.getElementById("quiz-btn").addEventListener("click", () => {
+document.getElementById("quiz-btn").addEventListener("click", async () => {
     const subject = document.getElementById("quiz-subject").value.trim();
     const topic = document.getElementById("quiz-topic").value.trim();
     const difficulty = document.getElementById("difficulty").value;
@@ -217,67 +200,212 @@ document.getElementById("quiz-btn").addEventListener("click", () => {
         return;
     }
 
+    const button = document.getElementById("quiz-btn");
     const result = document.getElementById("quiz-result");
+
+    button.disabled = true;
+    button.textContent = "Generating AI quiz...";
     result.classList.remove("hidden");
+    result.textContent = "Qwen is preparing your questions. Please wait...";
 
-    result.innerHTML = `
-        <h3>${escapeHTML(subject)}: ${escapeHTML(topic)}</h3>
-        <p>Difficulty: ${difficulty}</p>
-        <p><strong>Sample practice questions</strong></p>
-        <form id="quiz-form">
-            ${sampleQuestions.map((q, i) => `
-                <div style="margin:18px 0">
-                    <strong>${i + 1}. ${escapeHTML(q.question)}</strong>
-                    ${q.options.map((option, j) => `
-                        <label style="display:block;font-weight:normal">
-                            <input type="radio" name="q${i}" value="${j}"
-                                style="width:auto" required>
-                            ${escapeHTML(option)}
-                        </label>
-                    `).join("")}
-                </div>
-            `).join("")}
-            <button class="primary-btn" type="submit">Submit answers</button>
-        </form>
-    `;
-
-    document.getElementById("quiz-form").addEventListener("submit", event => {
-        event.preventDefault();
-
-        let score = 0;
-
-        sampleQuestions.forEach((q, i) => {
-            const selected = document.querySelector(
-                `input[name="q${i}"]:checked`
-            );
-
-            if (selected && Number(selected.value) === q.answer) {
-                score++;
-            }
+    try {
+        const response = await fetch("/api/generate-quiz", {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json"
+            },
+            body: JSON.stringify({ subject, topic, difficulty })
         });
 
-        const percentage = Math.round(
-            (score / sampleQuestions.length) * 100
-        );
+        const data = await response.json();
 
-        stats.quizzes++;
-        stats.totalScore += percentage;
+        if (!response.ok) {
+            throw new Error(data.message || "Quiz generation failed.");
+        }
 
-        saveData();
-        updateDashboard();
+        if (!Array.isArray(data.questions) || data.questions.length === 0) {
+            throw new Error("No structured questions were returned by the AI.");
+        }
 
-        addActivity(`Completed ${subject} quiz with ${percentage}%`);
+        const questions = data.questions;
 
-        result.innerHTML += `
-            <h3>Quiz completed!</h3>
-            <p>Your score: ${score}/${sampleQuestions.length}</p>
-            <h2>${percentage}%</h2>
-            <button class="primary-btn" onclick="showPage('progress')">
-                View progress
-            </button>
+        result.innerHTML = `
+            <h3>${escapeHTML(subject)}: ${escapeHTML(topic)}</h3>
+            <p>Difficulty: ${escapeHTML(difficulty)}</p>
+            <p>${questions.length} AI-generated questions</p>
+
+            <form id="quiz-form">
+                ${questions.map((q, i) => `
+                    <div class="quiz-question" style="margin:20px 0;padding:15px;border-bottom:1px solid #444">
+                        <strong>${i + 1}. ${escapeHTML(q.question)}</strong>
+
+                        <div style="margin-top:12px">
+                            ${q.options.map((option, j) => `
+                                <label style="display:block;margin:10px 0;font-weight:normal">
+                                    <input
+                                        type="radio"
+                                        name="q${i}"
+                                        value="${j}"
+                                        style="width:auto"
+                                        required
+                                    >
+                                    ${escapeHTML(option)}
+                                </label>
+                            `).join("")}
+                        </div>
+                    </div>
+                `).join("")}
+
+                <button class="primary-btn" type="submit">
+                    Submit answers
+                </button>
+            </form>
+
+            <div id="quiz-score"></div>
         `;
-    });
+
+        document.getElementById("quiz-form").addEventListener("submit", async event => {
+            event.preventDefault();
+
+            let score = 0;
+            const incorrectAnswers = [];
+
+            const review = questions.map((q, i) => {
+                const selected = document.querySelector(
+                    `input[name="q${i}"]:checked`
+                );
+
+                const selectedIndex = selected ? Number(selected.value) : -1;
+
+                // Supports numeric index, option text, or A/B/C/D answers
+                const correct = String(
+                    q.correctAnswer ?? q.answer ?? ""
+                ).trim();
+
+                const correctIndex = /^\d+$/.test(correct)
+                    ? Number(correct)
+                    : /^[A-D]$/i.test(correct)
+                        ? correct.toUpperCase().charCodeAt(0) - 65
+                        : q.options.findIndex(option =>
+                            String(option).trim().toLowerCase() === correct.toLowerCase()
+                        );
+
+                const isCorrect = selectedIndex === correctIndex;
+
+                if (isCorrect) {
+                    score++;
+                } else {
+                    incorrectAnswers.push({
+                        question: q.question,
+                        studentAnswer: selectedIndex >= 0 ? q.options[selectedIndex] : "Not answered",
+                        correctAnswer: correctIndex >= 0 ? q.options[correctIndex] : correct,
+                        explanation: q.explanation || ""
+                    });
+                }
+
+                return `
+                    <div style="margin:15px 0;padding:12px;border:1px solid #555;border-radius:8px">
+                        <strong>${i + 1}. ${isCorrect ? "Correct ✓" : "Incorrect ✗"}</strong>
+                        <p>Your answer: ${selectedIndex >= 0
+                            ? escapeHTML(q.options[selectedIndex])
+                            : "Not answered"}</p>
+                        <p>Correct answer: ${
+                            correctIndex >= 0 && correctIndex < q.options.length
+                                ? escapeHTML(q.options[correctIndex])
+                                : escapeHTML(correct)
+                        }</p>
+                        ${q.explanation
+                            ? `<p>Explanation: ${escapeHTML(q.explanation)}</p>`
+                            : ""}
+                    </div>
+                `;
+            });
+
+            const percentage = Math.round((score / questions.length) * 100);
+
+            stats.quizzes++;
+            stats.totalScore += percentage;
+
+            saveData();
+            updateDashboard();
+            addActivity(`Completed ${subject} quiz with ${percentage}%`);
+
+            document.getElementById("quiz-score").innerHTML = `
+                <h2>Quiz completed!</h2>
+                <h1>${score}/${questions.length}</h1>
+                <h2>${percentage}%</h2>
+                <h3>Answer Review</h3>
+                ${review.join("")}
+                <div id="revision-recommendation"></div>
+                <button class="primary-btn" id="progress-btn">
+                    View my progress
+                </button>
+            `;
+
+            document.getElementById("progress-btn").addEventListener("click", () => {
+                showPage("progress");
+            });
+
+            // Save topic-level performance locally for a lightweight learning history.
+            const history = JSON.parse(localStorage.getItem("prepPilotTopicHistory") || "{}");
+            const topicKey = `${subject} — ${topic}`;
+            const previous = history[topicKey] || { attempts: 0, correct: 0, total: 0 };
+            previous.attempts += 1;
+            previous.correct += score;
+            previous.total += questions.length;
+            history[topicKey] = previous;
+            localStorage.setItem("prepPilotTopicHistory", JSON.stringify(history));
+
+            // Ask the AI for targeted revision only when the student has mistakes.
+            if (incorrectAnswers.length > 0) {
+                const revisionBox = document.getElementById("revision-recommendation");
+                revisionBox.innerHTML = "<p>✦ Finding concepts to revise...</p>";
+
+                try {
+                    const revisionResponse = await fetch("/api/recommend-revision", {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({ subject, topic, incorrectAnswers })
+                    });
+                    const revisionData = await revisionResponse.json();
+
+                    if (!revisionResponse.ok) {
+                        throw new Error(revisionData.message || "Could not generate revision advice.");
+                    }
+
+                    revisionBox.innerHTML = `
+                        <div style="margin-top:20px;padding:16px;border:1px solid #8b9cf5;border-radius:10px">
+                            <h3>✦ Your personalized revision plan</h3>
+                            <p><strong>Focus on these concepts:</strong></p>
+                            <ul>${revisionData.weakConcepts.map(item => `<li>${escapeHTML(item)}</li>`).join("")}</ul>
+                            <p><strong>What to do next:</strong></p>
+                            <ul>${revisionData.revisionTasks.map(item => `<li>${escapeHTML(item)}</li>`).join("")}</ul>
+                            <p><strong>Next step:</strong> ${escapeHTML(revisionData.practiceAdvice)}</p>
+                        </div>
+                    `;
+                } catch (error) {
+                    revisionBox.textContent = "Your quiz score was saved, but revision advice could not be generated: " + error.message;
+                }
+            } else {
+                document.getElementById("revision-recommendation").innerHTML =
+                    "<p>Excellent work! You got every question right. Try a harder quiz to keep improving.</p>";
+            }
+
+            document.querySelectorAll("#quiz-form input").forEach(input => {
+                input.disabled = true;
+            });
+
+            document.querySelector("#quiz-form button[type='submit']").disabled = true;
+        });
+
+    } catch (error) {
+        result.textContent = "Error: " + error.message;
+    } finally {
+        button.disabled = false;
+        button.textContent = "Generate AI quiz ✦";
+    }
 });
+
 
 // TEMPORARY SAMPLE ANSWER EVALUATOR
 
@@ -320,8 +448,9 @@ document.getElementById("evaluate-btn").addEventListener("click", async () => {
         result.classList.remove("hidden");
 
         result.innerHTML = `
-            <h3>Answer received successfully!</h3>
-            <p><strong>Word count:</strong> ${data.wordCount}</p>
+    <h3>AI Evaluation Result</h3>
+    <h2>Score: ${data.score}/10</h2>
+    <p><strong>Word count:</strong> ${data.wordCount}</p>
             <p><strong>Feedback:</strong> ${escapeHTML(data.feedback)}</p>
             <h4>Suggestions for improvement</h4>
             <ul>
