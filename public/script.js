@@ -264,10 +264,11 @@ document.getElementById("quiz-btn").addEventListener("click", async () => {
             <div id="quiz-score"></div>
         `;
 
-        document.getElementById("quiz-form").addEventListener("submit", event => {
+        document.getElementById("quiz-form").addEventListener("submit", async event => {
             event.preventDefault();
 
             let score = 0;
+            const incorrectAnswers = [];
 
             const review = questions.map((q, i) => {
                 const selected = document.querySelector(
@@ -291,7 +292,16 @@ document.getElementById("quiz-btn").addEventListener("click", async () => {
 
                 const isCorrect = selectedIndex === correctIndex;
 
-                if (isCorrect) score++;
+                if (isCorrect) {
+                    score++;
+                } else {
+                    incorrectAnswers.push({
+                        question: q.question,
+                        studentAnswer: selectedIndex >= 0 ? q.options[selectedIndex] : "Not answered",
+                        correctAnswer: correctIndex >= 0 ? q.options[correctIndex] : correct,
+                        explanation: q.explanation || ""
+                    });
+                }
 
                 return `
                     <div style="margin:15px 0;padding:12px;border:1px solid #555;border-radius:8px">
@@ -326,6 +336,7 @@ document.getElementById("quiz-btn").addEventListener("click", async () => {
                 <h2>${percentage}%</h2>
                 <h3>Answer Review</h3>
                 ${review.join("")}
+                <div id="revision-recommendation"></div>
                 <button class="primary-btn" id="progress-btn">
                     View my progress
                 </button>
@@ -334,6 +345,51 @@ document.getElementById("quiz-btn").addEventListener("click", async () => {
             document.getElementById("progress-btn").addEventListener("click", () => {
                 showPage("progress");
             });
+
+            // Save topic-level performance locally for a lightweight learning history.
+            const history = JSON.parse(localStorage.getItem("prepPilotTopicHistory") || "{}");
+            const topicKey = `${subject} — ${topic}`;
+            const previous = history[topicKey] || { attempts: 0, correct: 0, total: 0 };
+            previous.attempts += 1;
+            previous.correct += score;
+            previous.total += questions.length;
+            history[topicKey] = previous;
+            localStorage.setItem("prepPilotTopicHistory", JSON.stringify(history));
+
+            // Ask the AI for targeted revision only when the student has mistakes.
+            if (incorrectAnswers.length > 0) {
+                const revisionBox = document.getElementById("revision-recommendation");
+                revisionBox.innerHTML = "<p>✦ Finding concepts to revise...</p>";
+
+                try {
+                    const revisionResponse = await fetch("/api/recommend-revision", {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({ subject, topic, incorrectAnswers })
+                    });
+                    const revisionData = await revisionResponse.json();
+
+                    if (!revisionResponse.ok) {
+                        throw new Error(revisionData.message || "Could not generate revision advice.");
+                    }
+
+                    revisionBox.innerHTML = `
+                        <div style="margin-top:20px;padding:16px;border:1px solid #8b9cf5;border-radius:10px">
+                            <h3>✦ Your personalized revision plan</h3>
+                            <p><strong>Focus on these concepts:</strong></p>
+                            <ul>${revisionData.weakConcepts.map(item => `<li>${escapeHTML(item)}</li>`).join("")}</ul>
+                            <p><strong>What to do next:</strong></p>
+                            <ul>${revisionData.revisionTasks.map(item => `<li>${escapeHTML(item)}</li>`).join("")}</ul>
+                            <p><strong>Next step:</strong> ${escapeHTML(revisionData.practiceAdvice)}</p>
+                        </div>
+                    `;
+                } catch (error) {
+                    revisionBox.textContent = "Your quiz score was saved, but revision advice could not be generated: " + error.message;
+                }
+            } else {
+                document.getElementById("revision-recommendation").innerHTML =
+                    "<p>Excellent work! You got every question right. Try a harder quiz to keep improving.</p>";
+            }
 
             document.querySelectorAll("#quiz-form input").forEach(input => {
                 input.disabled = true;
