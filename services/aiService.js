@@ -1,54 +1,62 @@
 
-const AI_MODE = process.env.AI_MODE || "demo";
-
 async function generateAIResponse(prompt) {
-
-    // Temporary demo mode
-    if (AI_MODE === "demo") {
+    if (process.env.AI_MODE !== "live") {
         return {
             success: true,
             mode: "demo",
-            message: "AI service is running successfully!",
+            message: "AI service is running in demo mode.",
             prompt
         };
     }
 
-    // BharatCode API mode
-    const apiKey = process.env.BHARATCODE_API_KEY;
-
-    if (!apiKey) {
-        throw new Error("BharatCode API key is missing.");
-    }
-
-    const response = await fetch(
-        "https://bharatcode.ai/api/model/v1/responses",
-        {
-            method: "POST",
-            headers: {
-                "Authorization": `Bearer ${apiKey}`,
-                "Content-Type": "application/json"
-            },
-            body: JSON.stringify({
-                model: "qwen-3.8-27b",
-                input: prompt,
-                store: false
-            })
-        }
-    );
-
-    const data = await response.json();
-
-    if (!response.ok) {
-        throw new Error(
-            data.error?.message || "BharatCode API request failed."
+    try {
+        const response = await fetch(
+            "https://bharatcode.ai/api/model/v1/responses",
+            {
+                method: "POST",
+                headers: {
+                    "Authorization": `Bearer ${process.env.BHARATCODE_API_KEY}`,
+                    "Content-Type": "application/json"
+                },
+                body: JSON.stringify({
+                    model: "qwen-3.8-27b",
+                    input: prompt,
+                    store: false
+                })
+            }
         );
-    }
 
-    return {
-        success: true,
-        mode: "live",
-        data
-    };
+        const data = await response.json();
+
+        if (!response.ok) {
+            throw new Error(
+                data.error?.message || JSON.stringify(data)
+            );
+        }
+
+        const text = (data.output || [])
+            .filter(item => item.type === "message")
+            .flatMap(item => item.content || [])
+            .filter(item => item.type === "output_text")
+            .map(item => item.text)
+            .join("\n");
+
+        return {
+            success: true,
+            mode: "live",
+            message: text,
+            usage: data.usage
+        };
+
+    } catch (error) {
+        console.error("BharatCode API Error:", error.message);
+
+        return {
+            success: false,
+            mode: "live",
+            message: error.message
+        };
+    }
 }
 
 module.exports = { generateAIResponse };
